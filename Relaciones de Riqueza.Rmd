@@ -1,0 +1,105 @@
+---
+title: "Relaciones de Riqueza de Especies"
+author: "Pamela Ubilla"
+date: "25 de agosto de 2018"
+output: 
+    html_document:
+        fig_caption: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(ggplot2)
+library(markdown)
+library(knitr)
+library(ggrepel)
+```
+
+## Relaciones de Riqueza de Mamiferos Carnivoros en Parques Estadounidenses
+
+En el siguiente estudio exploratorio se revisará preliminarmente si existe una relación entre la riqueza de mamiferos carnivoros habitando parques de Estados Unidos y el área del parque o si esta riqueza se relaciona mas bien con la riqueza de especies vegetales. 
+
+
+```{r}
+
+parks <- read_csv("parks.csv")
+species <- read_csv("species.csv")
+
+colnames(species) <- make.names(colnames(species))
+
+colnames(parks) <- make.names(colnames(parks))
+
+#Mamiferos carnivoros
+
+mcarnivoros6 <- species %>% filter (Category == "Mammal" & Order == "Carnivora") %>% filter (Occurrence == "Present")
+
+carni6 <- full_join (mcarnivoros6, parks)
+
+carni6 <- carni6 %>%  group_by( Park.Name, Park.Code, Acres) %>% summarise (n=n())
+
+carni6<- carni6 %>% rename (Riqueza.M.Carnivoros = n)
+
+#aca abajo quite:%>% select (Park.Name, Park.Code, Riqueza.Animal, Acres)
+Riqcarni6 <- carni6  %>% filter (!is.na(Riqueza.M.Carnivoros))
+
+#Vegetales
+
+especiesvegetales <- species %>% filter ( Category == "Vascular Plant" & Occurrence == "Present" )
+
+especiesvegetales2 <- especiesvegetales %>% select (Park.Name, Occurrence) %>% group_by(Park.Name) %>%  summarise (n=n())
+
+especiesvegetales2 <- especiesvegetales2 %>% rename (Riqueza.Vegetal = n) 
+
+especiesvegetales3 <- especiesvegetales2 %>% select(Park.Name, Riqueza.Vegetal)
+
+CarVeg <- left_join(Riqcarni6, especiesvegetales2)
+
+Tabla1 <- CarVeg %>% select (Park.Name, Park.Code , Acres, Riqueza.M.Carnivoros, Riqueza.Vegetal ) %>% arrange(Acres)
+
+kable (Tabla1, caption = "Tabla 1: Riqueza de mamiferos carnivoros y especies vegetales ordenados de acuerdo al area del parque. La riqueza fue calculada en base a los datos de presencia para mamiferos carnivos y plantas vasculares.", 
+    row.names = FALSE)
+```
+
+En la tabla se presentan los datos utilizados para visualizar las relaciones previamente mencionadas. Para los cálculos de riqueza se consideró solamente el valor de ocurrencia como "presente" y no aquellos referidos a la abundancia. Cabe mencionar que los parques estudiados incluyen el territorio estadounidaense en Alaska y Hawaii. 
+
+
+Gráfico 1: Riqueza de mamiferos carnivoros v/s área del parque. Se muestra para cada punto el código del parque correspondiente (Park.Code en Tabla 1). Ademas se muestra la tendencia de los datos (línea azul) y el intervalo de confianza del 95% (área ploma). 
+```{r}
+gRiqArea <- Tabla1 %>% filter (Acres <= 2000000)
+
+graf <- ggplot(gRiqArea, aes(Acres, Riqueza.M.Carnivoros, label= Park.Code)) + geom_smooth(method= "lm", formula= y~ x) + geom_point(color= "purple") 
+
+grafico <- graf + geom_text_repel(size=2, force = 5) +  theme_minimal(base_size = 12) 
+
+grafico
+```
+
+En el gráfico se observa que no existe una relación directa entre la riqueza de mamiferos carnivoros con el área de parque. A continuación se evaluará si esto se cumple también par las especies vegetales presentes. 
+
+Gráfico 2: Relación de la riqueza vegetal con el área de los parques. Se muestra para cada punto el código del parque correspondiente (Park.Code en Tabla 1). Ademas se muestra la tendencia de los datos (línea azul) y el intervalo de confianza del 95% (área ploma).
+```{r}
+
+graf2 <- ggplot(gRiqArea, aes(Acres, Riqueza.Vegetal, label= Park.Code))  + geom_smooth(method= "lm", formula= y~ x)+ geom_point(color= "green")
+
+grafico2 <- graf2 + geom_text_repel(size=2, force = 5) +  theme_minimal(base_size = 12)
+
+grafico2
+```
+
+Se observa en el gráfico que no existe relación entre el área y la riqueza vegetal en los parques estado unidenses.
+Finalmente se hará una exploración para evaluar, considerando la conexión entre niveles tróficos, una posible relación entre la riqueza de mamiferos carnivoros y la riqueza vegetal. 
+
+
+Gráfico 3: Comparación entre la riqueza vegetal y riqueza de mamiferos carnivoros. Se muestra para cada punto el código del parque correspondiente (Park.Code en Tabla 1). Ademas se muestra la tendencia de los datos (línea azul) y el intervalo de confianza del 95% (área ploma). El tamaño de los puntos representa el área del parque. 
+```{r}
+
+graf3 <- ggplot(gRiqArea, aes(Riqueza.Vegetal, Riqueza.M.Carnivoros, label = Park.Code)) +geom_smooth(method= "lm", formula= y~ x) + geom_point(aes(color = "red", size = Acres, alpha = 0.4))
+
+grafico3 <- graf3 + geom_text_repel(size=2, force = 5) +  theme_minimal(base_size = 12)
+
+grafico3
+
+```
+
+En el Gráfico 3 se observa que pareciera existir una relación directa entre la riqueza vegetal y la riqueza de mamiferos carnivoros, esto tiene sentido biológico dadas las conexiones entre los niveles tróficos qu conectan a productores primarios y consumidores terciarios.  
